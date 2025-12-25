@@ -41,6 +41,7 @@ Alerts are sent to **Slack** using Incoming Webhooks.
 | Alertmanager |
 | Slack | Notifications |
 
+
 ---
 
 ## 📊 Metrics Collected
@@ -66,6 +67,78 @@ Alerts are sent to **Slack** using Incoming Webhooks.
 - Notification: Slack
 
 ---
+
+## ⚙️ Configuration Files
+
+### prometheus.yml
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - "localhost:9093"
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "django-instance"
+    static_configs:
+      - targets: ["<DJANGO_EC2_IP>:8000"]
+
+  - job_name: "node-exporter"
+    static_configs:
+      - targets:
+          - "<DJANGO_EC2_IP>:9100"
+```
+
+---
+
+### alert_rules.yml
+
+```yaml
+groups:
+- name: system-alerts
+  rules:
+  - alert: HighCPUUsage
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage detected"
+      description: "CPU usage is above 80% on {{ $labels.instance }}"
+```
+
+---
+
+### alertmanager.yml
+
+```yaml
+global:
+  resolve_timeout: 1m
+
+route:
+  receiver: "slack-notifications"
+
+receivers:
+- name: "slack-notifications"
+  slack_configs:
+  - api_url: "<SLACK_WEBHOOK_URL>"
+    channel: "#prometheus-grafana-01"
+    title: "Prometheus Alert"
+    text: "CPU HIGH LOAD"
+```
+
 
 ## 🧪 Alert Testing
 
